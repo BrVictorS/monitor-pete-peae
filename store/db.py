@@ -144,6 +144,19 @@ class Razao:
         )
         return [r[0] for r in rows if r[0]]
 
+    def obter(self, ob: str) -> dict | None:
+        row = self.con.execute(
+            "SELECT * FROM lancamentos WHERE ob = ?", (ob,)).fetchone()
+        return dict(row) if row else None
+
+    def por_chave(self, cnpj: str, programa: str, parcela: int) -> list[dict]:
+        rows = self.con.execute(
+            "SELECT * FROM lancamentos WHERE cnpj=? AND programa=? AND parcela=? "
+            "ORDER BY ob",
+            (cnpj, programa, parcela),
+        )
+        return [dict(r) for r in rows]
+
     def anomalias(self) -> list[dict]:
         return [dict(r) for r in self.con.execute(
             "SELECT * FROM lancamentos WHERE revisao = 1 ORDER BY municipio, programa, parcela"
@@ -197,6 +210,15 @@ class Razao:
         self.con.executemany(sql, dados)
         self.con.commit()
         return len(dados)
+
+    def atualizar(self, ob: str, campos: dict) -> None:
+        """Atualiza campos específicos de um lançamento já existente (chave = ob)."""
+        if not campos:
+            return
+        sets = ", ".join(f"{c} = ?" for c in campos)
+        valores = list(campos.values()) + [ob]
+        self.con.execute(f"UPDATE lancamentos SET {sets} WHERE ob = ?", valores)
+        self.con.commit()
 
     def apagar_tudo(self) -> None:
         self.con.execute("DELETE FROM lancamentos")

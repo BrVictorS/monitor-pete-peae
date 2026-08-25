@@ -13,7 +13,7 @@ Sem dependência de Streamlit.
 """
 
 # ordem das "faixas" de coluna na grade, dado um mesmo número de parcela
-_ORDEM_TIPO = {"NORMAL": 0, "EXTRA": 1, "COMPLEMENTO": 2}
+_ORDEM_TIPO = {"NORMAL": 0, "EXTRA": 1, "COMPLEMENTO": 2, "ANULADA": 3}
 
 
 def definir_tipos(lancamentos: list[dict],
@@ -52,9 +52,92 @@ def definir_tipos(lancamentos: list[dict],
     return saida
 
 
+def _retipar_chave(razao, cnpj: str, programa: str, parcela: int) -> int:
+    """
+    Reprocessa NORMAL/EXTRA/COMPLEMENTO de todos os lançamentos ATIVOS
+    (tipo != ANULADA) de um (cnpj, programa, parcela), de forma determinística
+    (ordenado por OB). Lançamentos ANULADOS não competem pela vaga de NORMAL,
+    mas continuam no razão com seu tipo preservado (auditoria).
+    Devolve o nº de lançamentos ativos retipados.
+    """
+    if not programa or parcela is None:
+        return 0
+    grupo = razao.por_chave(cnpj, programa, parcela)
+    ja_tem_normal = False
+    ativos = 0
+    for l in grupo:
+        if l.get("tipo") == "ANULADA":
+            continue
+        ativos += 1
+        if l.get("complemento"):
+            tipo, revisao, motivo = "COMPLEMENTO", False, ""
+        elif not ja_tem_normal:
+            tipo, revisao, motivo = "NORMAL", False, ""
+            ja_tem_normal = True
+        else:
+            tipo, revisao = "EXTRA", True
+            motivo = "2ª OB normal na mesma parcela — conferir com a equipe de pagamento"
+        razao.atualizar(l["ob"], {
+            "tipo": tipo, "revisao": 1 if revisao else 0, "motivo_revisao": motivo,
+        })
+    return ativos
+
+
+def corrigir_classificacao(razao, ob: str, novo_programa: str, nova_parcela: int,
+                           novo_complemento: bool) -> dict:
+    """
+    Corrige manualmente o programa/parcela/complemento de UM lançamento (ex.:
+    a descrição foi capturada errada pelo bot — caso clássico de anomalia
+    EXTRA que na verdade é de outro programa) e retipa do zero os dois grupos
+    afetados (cnpj, programa, parcela): o que a OB deixou e o que passou a
+    ocupar. A retipagem é determinística (ordenada por OB), já que uma
+    correção manual invalida a ordem histórica de chegada usada por
+    `definir_tipos`.
+    """
+    atual = razao.obter(ob)
+    if not atual:
+        raise ValueError(f"OB {ob} não encontrada no razão.")
+
+    chave_antiga = (atual["cnpj"], atual["programa"], atual["parcela"])
+    chave_nova = (atual["cnpj"], novo_programa, nova_parcela)
+
+    razao.atualizar(ob, {
+        "programa": novo_programa,
+        "parcela": nova_parcela,
+        "complemento": 1 if novo_complemento else 0,
+    })
+
+    resumo = {}
+    for cnpj, programa, parcela in {chave_antiga, chave_nova}:
+        n = _retipar_chave(razao, cnpj, programa, parcela)
+        if programa and parcela is not None:
+            resumo[f"{programa} parcela {parcela}"] = n
+
+    return {"chave_antiga": chave_antiga, "chave_nova": chave_nova, "grupos": resumo}
+
+
+def anular_lancamento(razao, ob: str) -> dict:
+    """
+    Marca uma OB como ANULADA (parcela cancelada — ex.: pagamento anulado
+    no SIAFE após entrar no razão, ou OB duplicada que não deve contar).
+    Some da grade de pagamentos (PDF/WhatsApp) e libera a vaga NORMAL/EXTRA
+    da sua parcela para o(s) lançamento(s) que restarem, mas continua
+    visível no razão completo para auditoria.
+    """
+    atual = razao.obter(ob)
+    if not atual:
+        raise ValueError(f"OB {ob} não encontrada no razão.")
+
+    chave = (atual["cnpj"], atual["programa"], atual["parcela"])
+    razao.atualizar(ob, {"tipo": "ANULADA", "revisao": 0, "motivo_revisao": ""})
+    restantes = _retipar_chave(razao, *chave)
+    return {"chave": chave, "restantes": restantes}
+
+
 def rotulo_coluna(parcela: int, tipo: str) -> str:
     """Rótulo de coluna da grade. Ex.: (1,'NORMAL')->'1ª PARC'; (2,'COMPLEMENTO')->'2ª COMPL'."""
-    sufixo = {"NORMAL": "PARC", "EXTRA": "EXTRA", "COMPLEMENTO": "COMPL"}.get(tipo, "PARC")
+    sufixo = {"NORMAL": "PARC", "EXTRA": "EXTRA", "COMPLEMENTO": "COMPL",
+              "ANULADA": "ANULADA"}.get(tipo, "PARC")
     return f"{parcela}ª {sufixo}"
 
 

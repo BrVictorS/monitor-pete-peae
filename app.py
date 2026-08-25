@@ -22,7 +22,8 @@ import streamlit.components.v1 as components
 
 from core.leitura import ler_relatorio_ob, obs_distintas
 from core.classificacao import classificar, eh_pete_peae
-from core.razao import definir_tipos, montar_grade, grade_consolidada
+from core.razao import (definir_tipos, montar_grade, grade_consolidada,
+                        corrigir_classificacao, anular_lancamento)
 from core.whatsapp import gerar_texto
 from core.pdf import gerar_pdf, brl
 from core.municipios import DicionarioMunicipios
@@ -180,7 +181,7 @@ html, body, [class*="css"], .stApp {{
 def siafe_alcancavel(timeout=4):
     """True se o SIAFE responde (precisa da OpenVPN conectada)."""
     import socket
-    for host in ("www.siafe.pa.gov.br", "siafe.pa.gov.br"):
+    for host in ("177.74.1.218", "www.siafe.pa.gov.br", "siafe.pa.gov.br"):
         try:
             socket.create_connection((host, 80), timeout=timeout).close()
             return True
@@ -679,7 +680,7 @@ with aba_razao:
         with st.expander(f"⚠️ {len(grupos)} parcela(s) com anomalia — compare as OBs"):
             st.caption("Cada bloco mostra TODAS as OBs da mesma parcela, para você decidir "
                        "qual é a correta, qual está errada ou se a OB está duplicada.")
-            for g in grupos:
+            for gi, g in enumerate(grupos):
                 cab = g[0]
                 valores = {l["valor"] for l in g}
                 obs = [l["ob"] for l in g]
@@ -693,6 +694,45 @@ with aba_razao:
                     "VALOR": brl(l["valor"]), "STATUS": l["status_ob"],
                     "PROCESSO": l["processo"], "DESCRIÇÃO": l["descricao"]} for l in g]),
                     use_container_width=True, hide_index=True)
+
+                with st.form(key=f"corrigir_{gi}_{cab['municipio']}_{cab['parcela']}"):
+                    st.caption("Corrigir uma OB deste bloco (ex.: descrição capturada com "
+                               "o programa/parcela errado) ou marcar como anulada (ex.: "
+                               "pagamento cancelado no SIAFE / OB duplicada):")
+                    cf1, cf2, cf3, cf4 = st.columns([2, 1, 1, 1])
+                    ob_escolhida = cf1.selectbox("OB", obs, key=f"ob_{gi}")
+                    linha_atual = next(l for l in g if l["ob"] == ob_escolhida)
+                    prog_idx = 0 if linha_atual["programa"] == "PETE" else 1
+                    novo_programa = cf2.selectbox("Programa correto", ["PETE", "PEAE"],
+                                                  index=prog_idx, key=f"prog_{gi}")
+                    nova_parcela = cf3.number_input("Parcela correta", min_value=1, step=1,
+                                                    value=int(linha_atual["parcela"]),
+                                                    key=f"parc_{gi}")
+                    novo_complemento = cf4.checkbox("É complemento?",
+                                                    value=bool(linha_atual["complemento"]),
+                                                    key=f"compl_{gi}")
+                    bt1, bt2 = st.columns(2)
+                    salvar = bt1.form_submit_button("💾 Salvar correção",
+                                                    use_container_width=True)
+                    anular = bt2.form_submit_button("🚫 Marcar OB como anulada",
+                                                    use_container_width=True)
+                    if salvar:
+                        res = corrigir_classificacao(razao, ob_escolhida, novo_programa,
+                                                     int(nova_parcela), novo_complemento)
+                        st.success(
+                            f"OB {ob_escolhida} corrigida para {novo_programa} parcela "
+                            f"{nova_parcela}. Grupos revisados: " +
+                            ", ".join(f"{k} ({v} OB{'s' if v != 1 else ''})"
+                                     for k, v in res["grupos"].items()) +
+                            ". Reabra este bloco para ver a lista de anomalias atualizada.")
+                    elif anular:
+                        res = anular_lancamento(razao, ob_escolhida)
+                        st.success(
+                            f"OB {ob_escolhida} marcada como ANULADA — sai do PDF e do "
+                            f"WhatsApp, mas continua no razão completo para auditoria. "
+                            f"{res['restantes']} lançamento(s) ativo(s) restante(s) em "
+                            f"{res['chave'][1]} parcela {res['chave'][2]}. Reabra este "
+                            f"bloco para ver a lista de anomalias atualizada.")
 
     st.markdown("---")
     st.markdown('<p class="section-title">Razão completo</p>', unsafe_allow_html=True)

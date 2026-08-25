@@ -37,7 +37,7 @@ else:
     PASTA_ATUAL = os.path.dirname(os.path.abspath(__file__))
 
 CAMINHO_DRIVER = os.path.join(PASTA_ATUAL, "chromedriver.exe")
-LINK_SIAFE = "http://www.siafe.pa.gov.br/SIAFE/faces/fbFramesetTemplate.xhtml"
+LINK_SIAFE = "http://177.74.1.218/SIAFE/faces/fbFramesetTemplate.xhtml"
 
 
 class Status:
@@ -250,14 +250,30 @@ def capturar_descricao(driver, wait, ob):
             campo_ob.clear(); campo_ob.send_keys(ob)
         except Exception:
             return "", "erro"
+
+        # limpa o campo de descrição ANTES de disparar a busca: sem isso, o
+        # campo continua com o valor da OB pesquisada anteriormente até a
+        # resposta da busca atual chegar, e como a descrição é um texto
+        # genérico (ex. "6ª PARCELA DO PEAE/2026", igual para qualquer
+        # município), um AJAX lento faz a leitura pegar o valor "grudado" da
+        # OB anterior sem erro nenhum — atribuindo a descrição errada à OB
+        # atual. Zerando aqui, só um valor realmente novo pode aparecer.
+        try:
+            campo_desc = driver.find_element(By.ID, "paymentExtractPayment:description")
+            driver.execute_script("arguments[0].value = '';", campo_desc)
+        except Exception:
+            pass
+
         try:
             driver.find_element(By.ID, "FindButton").click()
-            time.sleep(1.5)
         except Exception:
             return "", "erro"
+
         try:
-            el = WebDriverWait(driver, 3).until(EC.presence_of_element_located(
-                (By.ID, "paymentExtractPayment:description")))
+            WebDriverWait(driver, 10).until(
+                lambda d: (d.find_element(By.ID, "paymentExtractPayment:description")
+                           .get_attribute("value") or "").strip() != "")
+            el = driver.find_element(By.ID, "paymentExtractPayment:description")
             desc = (el.get_attribute("value") or "").strip()
             return (desc, "ok") if desc else ("", "vazio")
         except Exception:

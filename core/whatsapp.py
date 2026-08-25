@@ -61,8 +61,9 @@ def gerar_texto(lancamentos_do_dia: list[dict], data_br: str) -> str:
     `lancamentos_do_dia`: lançamentos (dicts do razão) da data escolhida.
     `data_br`: data formatada 'dd/mm/aaaa' para o cabeçalho.
     """
-    pete = [l for l in lancamentos_do_dia if l.get("programa") == "PETE"]
-    peae = [l for l in lancamentos_do_dia if l.get("programa") == "PEAE"]
+    ativos = [l for l in lancamentos_do_dia if l.get("tipo") != "ANULADA"]
+    pete = [l for l in ativos if l.get("programa") == "PETE"]
+    peae = [l for l in ativos if l.get("programa") == "PEAE"]
 
     msg = f"📌 *RELATÓRIO DE PAGAMENTOS - {data_br}*\n"
     msg += _bloco(pete, "PETE")
