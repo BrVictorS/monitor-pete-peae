@@ -8,6 +8,7 @@ Saídas em docs/:
   • whatsapp.png        — prévia da mensagem de WhatsApp (Pillow)
 
 Uso:  python exemplos/gerar_imagens_demo.py
+      (requer DATABASE_URL; usa um esquema temporário `demo_imagens`, apagado no fim)
 """
 import sys
 from pathlib import Path
@@ -138,21 +139,15 @@ def whatsapp_png(razao):
 
 
 def main():
-    tmp = BASE / "exemplos" / "_img_temp.db"
-    if tmp.exists():
-        tmp.unlink()
-    razao = Razao(tmp)
-    importar_seed(str(SEED), razao, substituir=True)
+    # esquema temporário no PostgreSQL: não encosta no razão real (projetos.lancamentos)
+    razao = Razao(schema="demo_imagens")
     try:
+        importar_seed(str(SEED), razao, substituir=True)
         dashboard_png(razao)
         dashboard_app_png(razao)
         whatsapp_png(razao)
     finally:
-        razao.fechar()
-        try:
-            tmp.unlink()
-        except Exception:
-            pass
+        razao.descartar()
 
 
 if __name__ == "__main__":

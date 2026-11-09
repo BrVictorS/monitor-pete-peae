@@ -21,7 +21,7 @@ Resumo da solução.
 | app   | | |
 
 ## Modelo de dados / migração
-Mudanças de esquema no SQLite e como migrar o banco existente.
+Mudanças de esquema no PostgreSQL e como migrar o banco existente.
 
 ## Riscos
 -

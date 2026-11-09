@@ -79,9 +79,9 @@ def importar_seed(caminho_csv: str, razao: Razao | None = None,
 
 if __name__ == "__main__":
     import sys
-    # Desativado: roda sobre data/pete_peae.db e apagaria o razão inteiro,
+    # Desativado: roda sobre o razão no PostgreSQL e apagaria o razão inteiro,
     # inclusive as correções manuais. Só religar para montar um razão do zero.
-    sys.exit("Recarga do seed desativada: apagaria o razão atual (data/pete_peae.db).")
+    sys.exit("Recarga do seed desativada: apagaria o razão atual (PostgreSQL).")
     caminho = sys.argv[1] if len(sys.argv) > 1 else \
         r"C:\Users\SEDUC\Downloads\MONITORAMENTO PETE_PEAE 2026 - Página2.csv"
     print(importar_seed(caminho))

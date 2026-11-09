@@ -2,7 +2,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.x-FF4B4B?logo=streamlit&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-razão-003B57?logo=sqlite&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-razão-4169E1?logo=postgresql&logoColor=white)
 ![Selenium](https://img.shields.io/badge/Selenium-bot%20SIAFE-43B02A?logo=selenium&logoColor=white)
 ![Google Sheets](https://img.shields.io/badge/Google%20Sheets-sync-0F9D58?logo=googlesheets&logoColor=white)
 ![Status](https://img.shields.io/badge/status-em%20produção-0071CE)
@@ -47,6 +47,26 @@ start.bat            (ou: streamlit run app.py --server.port 8531)
 ```
 O app abre em http://localhost:8531 (porta diferente do de Diárias, 8501).
 
+### Banco de dados (PostgreSQL)
+O razão fica num PostgreSQL (local ou Supabase). Informe a URL de conexão na
+variável de ambiente `DATABASE_URL` **ou** na primeira linha de
+`secrets/database_url.txt` (pasta ignorada pelo git):
+```
+postgresql://usuario:senha@localhost:5432/pete_peae
+```
+O razão fica na tabela própria **`projetos.lancamentos`** (mesmas colunas do
+antigo SQLite) — separada das demais tabelas do esquema `projetos`, como a
+`conv_programas_repasses`, que o monitor não lê nem grava. A tabela e os índices
+são criados sozinhos na primeira conexão (o esquema também, se não existir); se
+já houver uma `projetos.lancamentos` com outra estrutura, o app recusa conectar.
+
+Para trazer um razão do antigo SQLite (`data/pete_peae.db`), com o destino vazio:
+```
+python -m store.migrar_sqlite [caminho.db]
+```
+Copia as linhas como estão (inclusive correções manuais) numa transação só e
+confere contagem, OBs e soma dos valores.
+
 ### Bot SIAFE (captura automática)
 Coloque o **`chromedriver.exe`** (compatível com seu Chrome) em `bot/`. Sem ele, o
 app funciona, mas a captura é manual (digita-se a descrição na etapa de revisão).
@@ -72,13 +92,15 @@ As imagens da seção *Demonstração* são reprodutíveis com:
 ```
 python exemplos/gerar_imagens_demo.py     # gera docs/dashboard_pete.png e docs/whatsapp.png
 ```
+(usa um esquema temporário `demo_imagens` no PostgreSQL configurado — não toca no razão real)
 
 ## Arquitetura (preparada p/ migrar ao SIMF)
 - `core/` — regra de negócio, **Python puro, sem Streamlit** (vira API/JS no SIMF).
   - `municipios.py` (CNPJ→município), `leitura.py` (lê OB), `classificacao.py`
     (descrição→programa/parcela), `razao.py` (tipo + grade), `whatsapp.py`, `pdf.py`.
-- `store/` — persistência atrás de interface. `db.py` (SQLite, esquema = razão →
-  troca p/ Supabase depois), `fonte_descricao.py` (costura bot→SQL), `seed.py`.
+- `store/` — persistência atrás de interface. `db.py` (PostgreSQL, esquema = razão;
+  mesmo SQL serve ao Supabase), `migrar_sqlite.py` (SQLite antigo → PostgreSQL),
+  `fonte_descricao.py` (costura bot→SQL), `seed.py`.
 - `bot/` — bot Selenium (worker local).
 - `app.py` — casca Streamlit (única peça descartável na migração).
 

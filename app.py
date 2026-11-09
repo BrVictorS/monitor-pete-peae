@@ -59,8 +59,9 @@ st.set_page_config(page_title="Monitor PETE/PEAE — SEDUC", layout="centered",
                    initial_sidebar_state="collapsed")
 
 # ── recursos compartilhados ───────────────────────────────────────────────────
-# Sem cache: abre a conexão SQLite a cada rerun (instantâneo, local). Evita o
-# problema de o @st.cache_resource segurar um objeto antigo após mudanças no código.
+# Sem cache_resource: um Razao() leve a cada rerun (evita segurar um objeto antigo
+# após mudanças no código). As conexões PostgreSQL vêm de um pool compartilhado
+# em store/db.py, então isso não abre conexão nova por rerun.
 razao = Razao()
 dic = DicionarioMunicipios()
 
