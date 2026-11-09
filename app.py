@@ -51,6 +51,10 @@ def _selenium_ok():
 # Manager automaticamente; só é obrigatório ter o Chrome instalado na máquina).
 BOT_DISPONIVEL = BOT_PATH.exists() and _selenium_ok()
 
+# Recarregar o seed apaga o razão inteiro, inclusive as correções manuais feitas
+# depois da carga inicial. Desativado; só religar para montar um razão do zero.
+SEED_HABILITADO = False
+
 st.set_page_config(page_title="Monitor PETE/PEAE — SEDUC", layout="centered",
                    initial_sidebar_state="collapsed")
 
@@ -545,7 +549,7 @@ with aba_proc:
 # ══════════════════════════════════════════════════════════════════════════════
 with aba_rel:
     if razao.total() == 0:
-        st.warning("Razão vazio. Importe o seed na aba Razão / Configurações ou processe um dia.")
+        st.warning("Razão vazio. Processe um dia na aba Processamento do dia.")
     else:
         st.markdown('<p class="section-title">Texto para WhatsApp (parcelas do dia)</p>',
                     unsafe_allow_html=True)
@@ -796,28 +800,33 @@ with aba_cfg:
 
     st.markdown("---")
     st.markdown('<p class="section-title">Recarregar razão inicial (seed)</p>', unsafe_allow_html=True)
-    st.error("⚠️ **Ação destrutiva.** Isto APAGA todo o razão atual (inclusive os dias já "
-             "lançados) e o substitui pelo CSV enviado. Use apenas no primeiro uso ou para "
-             "recarregar o histórico do zero. No dia a dia, o razão se atualiza sozinho ao "
-             "confirmar cada dia em **Processamento do dia** — não é preciso vir aqui.")
-    seed = st.file_uploader("Export 'MONITORAMENTO PETE/PEAE - Página2' (CSV)",
-                            type=["csv"], key="seed_up")
-    confirmar = st.checkbox("Entendo que isto **apaga o razão atual** e quero substituir.",
-                            key="seed_confirm")
-    if st.button("Importar e SUBSTITUIR o razão", type="primary",
-                 disabled=not (seed is not None and confirmar)):
-        tmp = DATA_DIR / "_seed_tmp.csv"
-        tmp.write_bytes(seed.getvalue())
-        try:
-            res = importar_seed(str(tmp), razao, dic, substituir=True)
-            st.success(f"Razão recarregado: {res['gravados']} lançamentos · "
-                       f"{res['anomalias']} anomalia(s).")
-            st.session_state.seed_confirm = False
-            st.rerun()
-        except Exception as e:
-            st.error(f"Erro ao importar: {e}")
-        finally:
+    if not SEED_HABILITADO:
+        st.info("Função desativada: recarregar o seed apagaria o razão atual, inclusive as "
+                "correções manuais. O razão se atualiza ao confirmar cada dia em "
+                "**Processamento do dia**.")
+    else:
+        st.error("⚠️ **Ação destrutiva.** Isto APAGA todo o razão atual (inclusive os dias já "
+                 "lançados) e o substitui pelo CSV enviado. Use apenas no primeiro uso ou para "
+                 "recarregar o histórico do zero. No dia a dia, o razão se atualiza sozinho ao "
+                 "confirmar cada dia em **Processamento do dia** — não é preciso vir aqui.")
+        seed = st.file_uploader("Export 'MONITORAMENTO PETE/PEAE - Página2' (CSV)",
+                                type=["csv"], key="seed_up")
+        confirmar = st.checkbox("Entendo que isto **apaga o razão atual** e quero substituir.",
+                                key="seed_confirm")
+        if st.button("Importar e SUBSTITUIR o razão", type="primary",
+                     disabled=not (seed is not None and confirmar)):
+            tmp = DATA_DIR / "_seed_tmp.csv"
+            tmp.write_bytes(seed.getvalue())
             try:
-                tmp.unlink()
-            except Exception:
-                pass
+                res = importar_seed(str(tmp), razao, dic, substituir=True)
+                st.success(f"Razão recarregado: {res['gravados']} lançamentos · "
+                           f"{res['anomalias']} anomalia(s).")
+                st.session_state.seed_confirm = False
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao importar: {e}")
+            finally:
+                try:
+                    tmp.unlink()
+                except Exception:
+                    pass

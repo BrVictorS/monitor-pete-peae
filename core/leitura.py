@@ -80,13 +80,23 @@ def ler_relatorio_ob(file_obj, nome_arquivo="relatorio.xlsx"):
         situacao = r[2].strip()
         ob = r[3].strip()
 
+        # 1. Primeira coluna deve conter a palavra "prefeitura" (case-insensitive)
+        if "prefeitura" not in credor.lower():
+            
+            if "prefeit" not in credor.lower():
+                continue
+
+        # 2. Quarta coluna (OB) não pode estar em branco
+        if not ob:
+            continue
+
         if not situacao or situacao.upper() in SITUACOES_IGNORAR:
             continue
         if situacao.upper() in SITUACOES_DESCARTAR:    # OB anulada/rejeitada
             continue
         if credor.upper() == "NOME DO CREDOR":
             continue
-        if not ob or "OB" not in ob.upper():
+        if "OB" not in ob.upper():
             continue
         valor = valor_para_float(r[8])
         if valor is None:
