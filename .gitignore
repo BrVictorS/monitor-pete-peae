@@ -3,14 +3,23 @@ secrets/
 # cobre a chave do Google e o data/gsheet.json
 *.json
 
-# dados reais (governo)
+# dados reais (governo): tudo em data/ fica fora, exceto a lista publica de municipios
+data/*
+!data/municipios.csv
 *.db
+*.db.bak*
 *.sqlite
-# temporarios e previews
-data/_*
-data/*.pdf
 
-# municipios.csv (publico) PODE ir - nao e ignorado.
+# anotacoes de trabalho com dados reais (OBs, processos, valores)
+docs/PENDENCIAS_*.md
+# documentacao e mockup gerados a partir de um caso real - so local
+exemplos/gerar_documentacao.py
+docs/DOCUMENTACAO_MONITOR_PETE_PEAE.pdf
+exemplos/gerar_mockup_anomalia.py
+docs/razao_anomalia_mockup.png
+
+# configuracao local do Claude Code
+.claude/
 
 # binarios / execucao
 *.exe
